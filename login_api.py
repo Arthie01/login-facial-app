@@ -4,11 +4,13 @@ login_api.py - Cliente Python para login facial
 Captura foto, la envía al API y retorna el resultado
 """
 
+import os
+os.environ["QT_QPA_FONTDIR"] = "/usr/share/fonts"
+
 import cv2
 import requests
 import base64
 import sys
-import os
 from dotenv import load_dotenv
 
 load_dotenv()

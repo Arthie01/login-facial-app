@@ -205,6 +205,11 @@ public class AppLogin extends JFrame {
                     
                     final String lineaActual = linea;
                     
+                    // Filtrar warnings de Qt/OpenCV
+                    if (linea.contains("QFontDatabase") || linea.contains("Qt no longer ships") || linea.contains("fontconfig") || linea.contains("dejavu-fonts")) {
+                        continue;
+                    }
+                    
                     // Actualizar log en tiempo real
                     SwingUtilities.invokeLater(() -> {
                         txtLog.append(lineaActual + "\n");

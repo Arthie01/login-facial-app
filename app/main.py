@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 import jwt
 from datetime import datetime, timedelta
 import base64
+import pickle
+import traceback
 
 # Cargar variables de entorno
 load_dotenv()
@@ -110,16 +112,38 @@ async def login_facial(request: LoginRequest):
         UMBRAL = 0.6  # Umbral de similitud (menor = más estricto)
 
         for usuario in usuarios:
-            # Convertir encoding de BD (string) a numpy array
-            encoding_bd = np.array([float(x) for x in usuario["encoding"].split(",")])
-            
-            # Calcular distancia euclidiana
-            distancia = face_recognition.face_distance([encoding_bd], encoding_login)[0]
-            
-            # Si es el mejor match hasta ahora
-            if distancia < mejor_distancia:
-                mejor_distancia = distancia
-                mejor_match = usuario
+            try:
+                encoding_raw = usuario["encoding"]
+                
+                # Formato bytea de Postgres: \x + hex(\x + base64(pickle))
+                if encoding_raw.startswith("\\x"):
+                    raw_hex = encoding_raw[2:]  # Quitar \x
+                    decoded_bytes = bytes.fromhex(raw_hex)
+                    decoded_str = decoded_bytes.decode("ascii", errors="replace")
+                    # Quitar segundo \\x
+                    if decoded_str.startswith("\\x"):
+                        b64_data = decoded_str[2:]
+                    else:
+                        b64_data = decoded_str
+                    pickle_bytes = base64.b64decode(b64_data)
+                    encoding_bd = np.array(pickle.loads(pickle_bytes))
+                elif "," in encoding_raw:
+                    # Formato CSV: "0.1,0.2,0.3,..."
+                    encoding_bd = np.array([float(x) for x in encoding_raw.split(",")])
+                else:
+                    # Base64 directo
+                    encoding_bd = np.array(pickle.loads(base64.b64decode(encoding_raw)))
+                
+                # Calcular distancia euclidiana
+                distancia = face_recognition.face_distance([encoding_bd], encoding_login)[0]
+                
+                # Si es el mejor match hasta ahora
+                if distancia < mejor_distancia:
+                    mejor_distancia = distancia
+                    mejor_match = usuario
+            except Exception as e:
+                print(f"Error procesando usuario {usuario.get('nombre', '?')}: {e}")
+                continue
 
         # 5. Verificar si hay un match válido
         if mejor_match and mejor_distancia < UMBRAL:
